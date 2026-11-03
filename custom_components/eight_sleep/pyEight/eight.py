@@ -165,7 +165,10 @@ class EightSleep:
 
     @property
     def last_prime(self):
-        return self.convert_string_to_datetime(self.device_data["lastPrime"])
+        last_prime = self.device_data.get("lastPrime")
+        if last_prime is None:
+            return None
+        return self.convert_string_to_datetime(last_prime)
 
     @property
     def firmware_version(self) -> str | None:
