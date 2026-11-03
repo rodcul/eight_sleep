@@ -315,6 +315,10 @@ def _get_rounded_value(attr: dict[str, Any], key: str) -> int | float | None:
 class EightUserSensor(EightSleepBaseEntity, SensorEntity):
     """Representation of an eight sleep user-based sensor."""
 
+    # Autopilot Adjustments carries up to 50 event dicts; keep them out of the
+    # recorder so each state change doesn't write the whole list to the database.
+    _unrecorded_attributes = frozenset({"adjustments"})
+
     def __init__(
         self,
         entry: ConfigEntry,
