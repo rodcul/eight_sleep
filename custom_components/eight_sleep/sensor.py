@@ -113,6 +113,13 @@ EIGHT_USER_SENSORS = [
     "sleep_latency",
     "out_of_bed_latency",
     "daily_sleep_debt",
+    "exercise_window_start",
+    "exercise_window_end",
+    "cognitive_window_start",
+    "cognitive_window_end",
+    "chronotype",
+    "social_jetlag",
+    "recommended_bedtime",
     "side",
     "routines",
 ]
@@ -416,6 +423,8 @@ class EightUserSensor(EightSleepBaseEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
         """Return device state attributes."""
+        if self._sensor == "recommended_bedtime" and self._user_obj:
+            return self._user_obj.bedtime_recommendation_attributes
         attr = None
         if self._sensor == "autopilot_adjustments" and self._user_obj:
             return self._user_obj.autopilot_adjustment_attributes
