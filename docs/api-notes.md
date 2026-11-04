@@ -136,10 +136,85 @@ All seen 2026-11-03 unless dated otherwise.
 - **404** on both hosts: `/health-integrations`, `/feature-flags`, `/settings`,
   `/hot-flash-mode`, `/onboarding`, `/checklist`, `/tasks`, `/preferences`,
   `/experiments`, `{app}/v1/devices/{id}`, `{app}/v1/devices/{id}/settings`.
+  Several of these exist one level down; see the app capture below
+  (`temperature/hot-flash-mode`, `health-integrations/metadata`,
+  `app-state/onboard`, `{app}/v1/devices/{id}/status`).
 - `temperatureSettings` can't be emptied. `DELETE …/temperature` and
   `DELETE …/temperature/{profile}` are **405**; the other attempts are 404 or
   200 with no change. The nearest reset is smart levels 0/0/0 and
   `{"schedules": []}`. (Seen 2026-09-21.)
+
+### From an app capture (2026-11-03)
+
+Endpoints the iOS app called on 2026-11-03 and 2026-11-04, captured with a
+proxy on one account. Shapes are top-level keys plus enum values seen. These
+are **Seen 2026-11-03**, but only from that one account. Nobody has called them
+from code yet.
+
+**Pod health and priming**: the most useful for monitoring a fleet.
+
+| Request | Answers |
+| --- | --- |
+| `GET {app}/v1/devices/{deviceId}/status` | `status` (`"updating"` seen), `ready`, `hasWater`, `needsPrime`, `firmwareVersion`, `firmwareUpdated`, `firmwareUpdating`, `lastConnected`. A compact health read. Note `needsPrime` here vs `needsPriming` on the device record |
+| `GET {app}/v1/devices/{deviceId}/priming/tasks/latest` | `task`: `status` (`finished`), `reason` (`requested` \| `scheduled`), `outcome` (`succeeded` \| `out-of-water`), `outcomeReason` (`flagCleared` \| `noWater`), `created`, `started`, `finished`, `isBlanketPriming`, `coverInfo.label` |
+| `GET {app}/v1/devices/{deviceId}/priming/schedule` | `schedule: [...]` |
+| `GET {app}/v1/devices/{deviceId}/live` | not answered in the capture |
+
+`outcome: "out-of-water"` on the latest prime is a direct "this bed ran dry"
+signal. `reason: "scheduled"` shows pods prime on a schedule as well as on request.
+
+**Subscriptions v3.** The app reads `GET {app}/v3/users/{userId}/subscriptions`,
+not v1. On top of `subscriptions` and `primarySubscription` it answers with
+computed flags: `hasAccessToPremiumFeatures`, `hasAccessToBasicFeatures`,
+`hasBasic`, `isInGracePeriod`, `isUnpaidPremium`, `churned`,
+`cancellationReason` (`temporary` \| `user_initiated`), `capabilities: [...]` and
+`captureStatus` (`type: "recapture"` plus the lapsed subscription). Each
+record adds `status` (`active` \| `inactive`), `provider` (`stripe` \|
+`eight_internal`), `subscriptionTier` (`plus` \| `pro`), `subscriptionFrequency`
+(`yearly` \| `lifetime`), `gracePeriodEnd`, `lastPaymentDate`, `isRental`,
+`ownerUserId`, `subscriberRelationship` (`self`). **This may replace
+hand-picking a record by id prefix.** Whether v3 has the same own-token-only
+403 as v1 is untested. `POST {app}/v3/users/{userId}/subscriptions/redeem`
+takes `{code, userId}`.
+
+**Onboarding state exists after all.** `GET {app}/v1/users/{userId}/app-state/onboard`
+→ `{"value": {lastOnboardTime, testDriveCompletedTimestamp, pod5TestDriveCompletedTimestamp}}`,
+and the app writes it with `PATCH` and the same `{"value": {...}}` body. This
+is likely what the phone's "test drive" nag reads. `app-state/messages` (GET/PUT
+`{"value": ...}`) is the same pattern.
+
+**Other reads seen:**
+
+| Request | Answers |
+| --- | --- |
+| `GET {auth}/v1/grants` | `grants: [...]` |
+| `GET {client}/v1/users/{userId}/intervals?next=…` | Sleep sessions, paged: `stageSummary`, `stages`, `timeseries` (`heartRate`, `hrv`, `rmssd`, `respiratoryRate`, `tempBedC`, `tempRoomC`, `heating`, `tnt`, …), `score`, `device.{id,side,specialization}` |
+| `GET {client}/v1/users/{userId}/temperature` | `currentLevel`, `currentState`, `currentSchedule`, `nextSchedule`, `nextBedtimeDisplayWindow`, `settings` (on `client-api`, not just `app-api`) |
+| `GET {app}/v1/users/{userId}/release-features` | Per-account feature flags: `autoPriming`, `primingCancellation`, `enableHotFlashMode`, `enableMultipodV3`, `enableSensorDisconnectWarning`, `deviceAlarmSupport`, `supportedPatterns`, … (~90 keys) |
+| `GET {app}/v1/users/{userId}/temperature/hot-flash-mode` | `enabled`, `hotFlashDuration` (`"0:15:00"`), `levelDelta` |
+| `GET {app}/v1/users/{userId}/active-mode` | `mode` (`standard` seen) |
+| `GET {app}/v1/users/{userId}/level-suggestions-mode` | `autopilotEnabled`, `autopilotMode`, `autopilotOptions` |
+| `GET {app}/v1/users/{userId}/autopilotDetails/autopilotRecap?day=…&tz=…` | Per-night temperature, pillow and elevation adjustment counts and lists, `isProcessingComplete` |
+| `GET {app}/v1/users/{userId}/days/count` | `count` (nights recorded) |
+| `GET {app}/v1/users/{userId}/devices/all/tap-settings` | Per-device double/quad-tap actions and options |
+| `GET {app}/v1/users/{userId}/notifications?active&limit` | `notifications`, `pagination.{cursor,hasMore,limit}` |
+| `GET {app}/v1/users/{userId}/metrics/summary?from&to&tz&metrics&periods` | `days` |
+| `GET {app}/v1/users/{userId}/metrics/aggregate?to&tz&metrics&periods` | `periods` |
+| `GET {app}/v1/users/{userId}/insights?date=…`, `/llm-insights?from&to`, `/llm-insights/settings` | Insight text; settings are `length`, `tone` |
+| `GET {app}/v1/users/{userId}/tags/days`, `/tags/recommendations`, `/truth-tags` | Sleep tags |
+| `GET {app}/v1/users/{userId}/health-integrations/metadata` | Connected health sources and sync summary |
+| `GET {app}/v1/intelligence/{userId}/podai/bio-age[/trend]` | Biological age estimate |
+| `GET {app}/v1/sms/users/{userId}` | SMS enrolment (404 when not enrolled) |
+| `GET {app}/v1/health-survey/test-drive`, `/v1/audio/categories`, `/v2/users/{userId}/referral/campaigns` | App content |
+| `GET {app}/v1/users/{userId}/events` | **101 Switching Protocols**: a websocket for live events |
+
+**Writes seen:** `PUT {app}/v1/users/{userId}/temperature/pod?ignoreDeviceErrors=…`
+with `{"currentLevel": n}` (200); `PUT {app}/v1/users/{userId}/temperature/all`
+with `currentState` (400 in the capture); `PUT {client}/v1/users/me?enableValidation=…`
+with `devices`, `notifications`; push-target registration under
+`{client}/v1/users/me/push-targets/…`; health-data upload under
+`{app}/v1/users/{userId}/health-integrations/sources/…` and
+`{app}/v2/users/{userId}/health-integrations/sources/apple-health/batches`.
 
 ## Gotchas
 
