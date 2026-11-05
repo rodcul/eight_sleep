@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 import logging
 import statistics
 from typing import TYPE_CHECKING, Any
+from zoneinfo import ZoneInfo
 
 from .constants import APP_API_URL, DATE_FORMAT, DATE_TIME_ISO_FORMAT, CLIENT_API_URL, POSSIBLE_SLEEP_STAGES
 from .exceptions import RequestError
@@ -23,6 +24,7 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 AUTOPILOT_UPDATE_INTERVAL = timedelta(hours=1)
+BEDTIME_RECOMMENDATION_UPDATE_INTERVAL = timedelta(hours=1)
 
 
 class EightUser:  # pylint: disable=too-many-public-methods
@@ -55,6 +57,8 @@ class EightUser:  # pylint: disable=too-many-public-methods
         self._last_autopilot_details_update: datetime | None = None
         self._last_autopilot_events_update: datetime | None = None
         self._autopilot_events_day: str | None = None
+        self._bedtime_recommendation: dict[str, Any] = {}
+        self._last_bedtime_recommendation_update: datetime | None = None
 
     def get_autopilot_target_temp(self, unit: str = "c") -> float | None:
         """Return the temperature that Autopilot (smart schedule) is currently targeting."""
@@ -104,6 +108,101 @@ class EightUser:  # pylint: disable=too-many-public-methods
             return None
         value = current_data.get(keys[-1])
         return None if value == "None" else value
+
+    def _performance_window_value(self, section: str, key: str) -> Any:
+        """Read an available performance window from the latest trend."""
+        if self._get_trend(0, ("performanceWindows", "isAvailable")) is not True:
+            return None
+        return self._get_trend(0, ("performanceWindows", section, key))
+
+    def _performance_window_time(self, section: str, key: str) -> datetime | None:
+        """Combine a window's local time with the local wake date."""
+        try:
+            local_time = datetime.strptime(
+                self._performance_window_value(section, key), "%H:%M:%S"
+            ).time()
+            local_day = datetime.strptime(self._get_trend(0, "day"), "%Y-%m-%d").date()
+            return datetime.combine(local_day, local_time, ZoneInfo(self.device.timezone))
+        except (ValueError, TypeError, KeyError):
+            return None
+
+    @property
+    def exercise_window_start(self) -> datetime | None:
+        """Return the exercise window start."""
+        return self._performance_window_time("exerciseWindow", "exerciseWindowStart")
+
+    @property
+    def exercise_window_end(self) -> datetime | None:
+        """Return the exercise window end."""
+        return self._performance_window_time("exerciseWindow", "exerciseWindowEnd")
+
+    @property
+    def cognitive_window_start(self) -> datetime | None:
+        """Return the cognitive window start."""
+        return self._performance_window_time("cognitiveWindow", "cognitiveWindowStart")
+
+    @property
+    def cognitive_window_end(self) -> datetime | None:
+        """Return the cognitive window end."""
+        return self._performance_window_time("cognitiveWindow", "cognitiveWindowEnd")
+
+    @property
+    def chronotype(self) -> str | None:
+        """Return the chronotype once calibration is complete."""
+        if self._performance_window_value("chronotype", "isCalibrating") is not False:
+            return None
+        value = self._performance_window_value("chronotype", "chronoClass")
+        return value if isinstance(value, str) else None
+
+    @property
+    def social_jetlag(self) -> int | float | None:
+        """Return social jetlag in seconds."""
+        value = self._performance_window_value("socialJetlag", "socialJetlagSeconds")
+        return value if isinstance(value, (int, float)) else None
+
+    @property
+    def recommended_bedtime(self) -> datetime | None:
+        """Return the next occurrence of the recommended local bedtime."""
+        try:
+            local_time = datetime.strptime(
+                self._bedtime_recommendation.get("recommendedBedtime"), "%H:%M:%S"
+            ).time()
+            now = datetime.now(ZoneInfo(self.device.timezone))
+            bedtime = datetime.combine(now.date(), local_time, now.tzinfo)
+            if bedtime <= now:
+                bedtime += timedelta(days=1)
+            return bedtime
+        except (ValueError, TypeError, KeyError):
+            return None
+
+    @property
+    def bedtime_recommendation_attributes(self) -> dict[str, Any]:
+        """Return the cached recommendation's supporting data."""
+        return {
+            "standard_deviation": self._bedtime_recommendation.get("standardDeviation"),
+            "days_analyzed": self._bedtime_recommendation.get("daysAnalyzed"),
+        }
+
+    async def update_bedtime_recommendation(self) -> None:
+        """Fetch at most hourly, retaining the recommendation on errors."""
+        now = datetime.now(timezone.utc)
+        if (
+            self._last_bedtime_recommendation_update is not None
+            and now - self._last_bedtime_recommendation_update
+            < BEDTIME_RECOMMENDATION_UPDATE_INTERVAL
+        ):
+            return
+        self._last_bedtime_recommendation_update = now
+        url = APP_API_URL + f"v1/users/{self.user_id}/bedtime/recommendation"
+        try:
+            data = await self.device.api_request("get", url)
+            if not isinstance(data, dict):
+                raise ValueError("Expected a recommendation object")
+            datetime.strptime(data.get("recommendedBedtime"), "%H:%M:%S")
+        except (RequestError, ValueError, TypeError) as err:
+            _LOGGER.debug("Error fetching bedtime recommendation for %s: %s", self.user_id, err)
+            return
+        self._bedtime_recommendation = data
 
     def _get_quality_score(self, trend_num: int, key: str) -> Any:
         """Get quality score for specified key."""
@@ -809,6 +908,7 @@ class EightUser:  # pylint: disable=too-many-public-methods
         await self.update_pillow_data()
         await self.update_autopilot_details()
         await self.update_autopilot_events()
+        await self.update_bedtime_recommendation()
 
         if self.target_heating_level is None:
             self.target_heating_temp = None
