@@ -33,6 +33,14 @@ NAME_MAP = {
     "time_slept": NameMapEntity(
         "Time Slept", "s", SensorDeviceClass.DURATION
     ),
+    "snore_duration": NameMapEntity(
+        "Snore Duration", "s", SensorDeviceClass.DURATION
+    ),
+    "heavy_snore_duration": NameMapEntity(
+        "Heavy Snore Duration", "s", SensorDeviceClass.DURATION
+    ),
+    "snore_percent": NameMapEntity("Snore Percent", "%"),
+    "heavy_snore_percent": NameMapEntity("Heavy Snore Percent", "%"),
     "presence_start": NameMapEntity(
         "Presence Start",
         device_class=SensorDeviceClass.TIMESTAMP,
@@ -43,13 +51,33 @@ NAME_MAP = {
         device_class=SensorDeviceClass.TIMESTAMP,
         state_class=None
     ),
+    "sleep_latency": NameMapEntity(
+        "Time to Fall Asleep", "s", SensorDeviceClass.DURATION
+    ),
+    "out_of_bed_latency": NameMapEntity(
+        "Time to Get Out of Bed", "s", SensorDeviceClass.DURATION
+    ),
+    "daily_sleep_debt": NameMapEntity(
+        "Daily Sleep Debt", "s", SensorDeviceClass.DURATION
+    ),
     "next_alarm": NameMapEntity(
         "Next Alarm",
         device_class=SensorDeviceClass.TIMESTAMP,
         state_class=None
     ),
+    "snore_mitigation_events": NameMapEntity("Snore Mitigation Events"),
+    "snoring_reduction_percent": NameMapEntity("Snoring Reduction", "%"),
+    "elevation_duration": NameMapEntity(
+        "Elevation Duration", "s", SensorDeviceClass.DURATION
+    ),
     "target_heating_temp": NameMapEntity(
         "Target Temperature",
+        "°C",
+        SensorDeviceClass.TEMPERATURE,
+        SensorStateClass.MEASUREMENT
+    ),
+    "current_measured_bed_temp": NameMapEntity(
+        "Measured Bed Temperature",
         "°C",
         SensorDeviceClass.TEMPERATURE,
         SensorStateClass.MEASUREMENT

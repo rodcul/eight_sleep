@@ -75,6 +75,17 @@ ATTR_FIT_OUT_SCORE = "Fitness Out-of-Bed Score"
 ATTR_FIT_WAKEUP_SCORE = "Fitness Wakeup Score"
 ATTR_ALARM_ID = "Alarm ID"
 ATTR_LAST_INSERT_REPLACEMENT = "Last Replacement"
+ATTR_SCORED_NIGHT_VALUE = "Scored Night Value"
+ATTR_PERSONAL_RANGE_LOW = "Personal Range Low"
+ATTR_PERSONAL_RANGE_HIGH = "Personal Range High"
+ATTR_SEVEN_DAY_AVG = "7-Day Average"
+
+# Sensors whose sleep quality metric carries a personal range in the trends data.
+PERSONAL_RANGE_METRICS = {
+    "current_heart_rate": "heartRate",
+    "current_hrv": "hrv",
+    "current_breath_rate": "respiratoryRate",
+}
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -84,21 +95,35 @@ EIGHT_USER_SENSORS = [
     "current_sleep_quality_score",
     "current_sleep_routine_score",
     "time_slept",
+    "snore_duration",
+    "heavy_snore_duration",
+    "snore_percent",
+    "heavy_snore_percent",
     "current_heart_rate",
     "current_hrv",
     "current_breath_rate",
     "bed_temperature",
+    "current_measured_bed_temp",
     "target_heating_temp",
     "sleep_stage",
     "next_alarm",
     "bed_state_type",
     "presence_start",
     "presence_end",
+    "sleep_latency",
+    "out_of_bed_latency",
+    "daily_sleep_debt",
     "side",
     "routines",
 ]
 
 EIGHT_HEAT_SENSORS = ["bed_state"]
+# Snore mitigation from the trends data; only filled in with a Base.
+EIGHT_BASE_USER_SENSORS = [
+    "snore_mitigation_events",
+    "snoring_reduction_percent",
+    "elevation_duration",
+]
 # Priming / water / firmware-updating / online are now proper binary_sensors
 # (see binary_sensor.py) so HA reads their on/off transitions correctly.
 EIGHT_ROOM_SENSORS = [
@@ -148,6 +173,11 @@ async def async_setup_entry(
             EightHeatSensor(entry, device_coordinator, eight, user, sensor)
             for sensor in EIGHT_HEAT_SENSORS
         )
+        if eight.has_base:
+            all_sensors.extend(
+                EightUserSensor(entry, user_coordinator, eight, user, sensor)
+                for sensor in EIGHT_BASE_USER_SENSORS
+            )
 
     all_sensors.extend(
         EightRoomSensor(entry, user_coordinator, eight, sensor)
@@ -477,6 +507,15 @@ class EightUserSensor(EightSleepBaseEntity, SensorEntity):
             state_attr[ATTR_SLEEP_STAGE] = attr["stage"]
             state_attr[ATTR_ROOM_TEMP] = room_temp
             state_attr[ATTR_BED_TEMP] = bed_temp
+            if self._sensor in PERSONAL_RANGE_METRICS:
+                personal = self._user_obj.personal_range(
+                    PERSONAL_RANGE_METRICS[self._sensor]
+                )
+                if personal is not None:
+                    state_attr[ATTR_SCORED_NIGHT_VALUE] = personal["night"]
+                    state_attr[ATTR_PERSONAL_RANGE_LOW] = personal["low"]
+                    state_attr[ATTR_PERSONAL_RANGE_HIGH] = personal["high"]
+                    state_attr[ATTR_SEVEN_DAY_AVG] = personal["seven_day_average"]
         elif "last" in self._sensor:
             state_attr[ATTR_AVG_RESP_RATE] = _get_rounded_value(attr, "resp_rate")
             state_attr[ATTR_AVG_HEART_RATE] = _get_rounded_value(attr, "heart_rate")

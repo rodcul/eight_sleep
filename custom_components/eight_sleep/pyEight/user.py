@@ -438,6 +438,26 @@ class EightUser:  # pylint: disable=too-many-public-methods
         return self._get_trend(0, ("sleepDuration"))
 
     @property
+    def snore_duration(self) -> int | None:
+        """Return seconds spent snoring in the latest session."""
+        return self._get_trend(0, "snoreDuration")
+
+    @property
+    def heavy_snore_duration(self) -> int | None:
+        """Return seconds spent snoring heavily in the latest session."""
+        return self._get_trend(0, "heavySnoreDuration")
+
+    @property
+    def snore_percent(self) -> int | None:
+        """Return the share of sleep spent snoring in the latest session."""
+        return self._get_trend(0, "snorePercent")
+
+    @property
+    def heavy_snore_percent(self) -> int | None:
+        """Return the share of sleep spent snoring heavily in the latest session."""
+        return self._get_trend(0, "heavySnorePercent")
+
+    @property
     def presence_start(self):
         timestamp = self._get_trend(0, "presenceStart")
         if timestamp:
@@ -455,6 +475,30 @@ class EightUser:  # pylint: disable=too-many-public-methods
         return self._get_routine_score(0, "latencyOutSeconds")
 
     @property
+    def sleep_latency(self) -> int | None:
+        """Return seconds from getting into bed to falling asleep."""
+        return self._get_trend(0, ("sleepRoutineScore", "latencyAsleepSeconds", "current"))
+
+    @property
+    def out_of_bed_latency(self) -> int | None:
+        """Return seconds from waking up to getting out of bed."""
+        return self._get_trend(0, ("sleepRoutineScore", "latencyOutSeconds", "current"))
+
+    @property
+    def daily_sleep_debt(self) -> int | None:
+        """Return how far the latest night fell short of the sleep baseline.
+
+        This is the latest night only (baseline minus time slept), not a running
+        total, and it goes negative after a night longer than the baseline.
+        None while Eight Sleep is still calibrating the baseline.
+        """
+        debt = self._get_trend(0, ("sleepQualityScore", "sleepDebt"))
+        if not isinstance(debt, dict) or debt.get("isCalibrating"):
+            return None
+        seconds = debt.get("dailySleepDebtSeconds")
+        return None if seconds is None else round(seconds)
+
+    @property
     def current_hrv(self) -> float | None:
         """Return wakeup consistency score for latest session."""
         return self._get_trend(0, ("sleepQualityScore", "hrv", "current"))
@@ -464,10 +508,43 @@ class EightUser:  # pylint: disable=too-many-public-methods
         """Return wakeup consistency score for latest session."""
         return self._get_trend(0, ("sleepQualityScore", "respiratoryRate", "current"))
 
+    def personal_range(self, metric: str) -> dict[str, Any] | None:
+        """Return the latest night's personal range for a sleep quality metric.
+
+        Eight Sleep scores heartRate, hrv and respiratoryRate against a range
+        it learns from the user's own nights. "night" is the value it scored,
+        which for heart rate is not the live reading the sensor shows. None
+        when the metric is absent.
+        """
+        values = self._get_trend(0, ("sleepQualityScore", metric))
+        if not isinstance(values, dict):
+            return None
+        return {
+            "night": values.get("current"),
+            "low": values.get("lowerRange"),
+            "high": values.get("upperRange"),
+            "seven_day_average": values.get("inclusive7DayAverage"),
+        }
+
     @property
     def current_wakeup_consistency_score(self) -> int | None:
         """Return wakeup consistency score for latest session."""
         return self._get_routine_score(0, "wakeupConsistency")
+
+    @property
+    def snore_mitigation_events(self) -> int | None:
+        """Return how many times the Base acted on snoring in the latest session."""
+        return self._get_trend(0, "mitigationEvents")
+
+    @property
+    def snoring_reduction_percent(self) -> int | None:
+        """Return how much the Base cut snoring in the latest session."""
+        return self._get_trend(0, "snoringReductionPercent")
+
+    @property
+    def elevation_duration(self) -> int | None:
+        """Return seconds the Base spent raised in the latest session."""
+        return self._get_trend(0, "elevationDuration")
 
     @property
     def current_fitness_session_date(self) -> str | None:
@@ -484,6 +561,15 @@ class EightUser:  # pylint: disable=too-many-public-methods
         """Return current bed temperature for in-progress session."""
         # return self._get_current_interval_property_value("tempBedC")
         return self.current_side_temp
+
+    @property
+    def current_measured_bed_temp(self) -> int | float | None:
+        """Return the last measured bed temperature for in-progress session.
+
+        current_bed_temp is the side's heating level converted to degrees; this
+        is the reading the pod measures (tempBedC in the session timeseries).
+        """
+        return self._get_current_trend_property_value("tempBedC")
 
     @property
     def current_room_temp(self) -> int | float | None:
