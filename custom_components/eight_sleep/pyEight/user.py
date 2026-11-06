@@ -16,6 +16,8 @@ from zoneinfo import ZoneInfo
 
 from .constants import APP_API_URL, DATE_FORMAT, DATE_TIME_ISO_FORMAT, CLIENT_API_URL, POSSIBLE_SLEEP_STAGES
 from .exceptions import RequestError
+from .structs import OnboardingState
+from .subscription import UNAVAILABLE, SubscriptionState, judge_subscription
 from .util import heating_level_to_temp
 
 if TYPE_CHECKING:
@@ -1451,6 +1453,47 @@ class EightUser:  # pylint: disable=too-many-public-methods
             _LOGGER.error("Unable to fetch user profile data for %s", self.user_id)
         else:
             self._user_profile = profile_data["user"]
+
+    async def subscription(self) -> SubscriptionState:
+        """Return this user's judged subscription state from v3.
+
+        Only the account's own token can read it (seen on v1). A 403 is
+        `unavailable`, not "no subscription": on a two-user bed the partner's
+        side can't be read with the main token.
+        """
+        url = f"{APP_API_URL}v3/users/{self.user_id}/subscriptions"
+        try:
+            body = await self.device.api_request(
+                "get", url, expected_statuses=(403,)
+            )
+        except RequestError as err:
+            if err.status == 403:
+                return SubscriptionState(UNAVAILABLE)
+            raise
+        return judge_subscription(body)
+
+    async def onboarding_state(self) -> OnboardingState | None:
+        """Return the app's onboarding state for this user, or None on a 404.
+
+        Read only. The app writes the same resource with `PATCH` and a
+        `{"value": {...}}` body; this client does not.
+        """
+        url = f"{APP_API_URL}v1/users/{self.user_id}/app-state/onboard"
+        data = await self.device.get_or_none(url)
+        if data is None:
+            return None
+        value = data.get("value") if isinstance(data, dict) else None
+        if not isinstance(value, dict):
+            return OnboardingState(last_onboard_time=None, test_drive_completed=None)
+        return OnboardingState(
+            last_onboard_time=self.device.optional_datetime(
+                value.get("lastOnboardTime")
+            ),
+            test_drive_completed=bool(
+                value.get("testDriveCompletedTimestamp")
+                or value.get("pod5TestDriveCompletedTimestamp")
+            ),
+        )
 
     async def update_trend_data(self, start_date: str, end_date: str) -> None:
         """Update trends data json for specified time period. V2 of the api used"""

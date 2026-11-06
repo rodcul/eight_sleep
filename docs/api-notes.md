@@ -75,30 +75,30 @@ day.
 
 | Purpose | Request | Status |
 | --- | --- | --- |
-| Account and device list | `GET {client}/v1/users/me` | Seen 2026-09-18 |
-| Everything about a pod | `GET {client}/v1/devices/{deviceId}` | Seen 2026-09-18 |
-| Cheap field subset | `GET {client}/v1/devices/{id}?filter=leftUserId,rightUserId,awaySides` | In code |
-| Current device / side | `GET {client}/v1/users/{userId}/current-device` | In code |
-| User profile | `GET {client}/v1/users/{userId}` | Seen 2026-09-19 |
-| Sleep history | `GET {client}/v1/users/{userId}/trends?tz=…&from=YYYY-MM-DD&to=…&include-main=false&include-all-sessions=true&model-version=v2` | Seen 2026-10-05 |
-| Households (device picker) | `GET {app}/v1/household/users/{userId}/summary` | In code |
-| Subscriptions | `GET {app}/v1/users/{userId}/subscriptions` | Seen 2026-09-24 |
-| Temperature state | `GET {app}/v1/users/{userId}/temperature` | In code |
-| All zones + schedules | `GET {app}/v1/users/{userId}/temperature/all` | Seen 2026-09-22 |
-| Pillow zone | `GET {app}/v1/users/{userId}/temperature/pillow` | Seen 2026-11-03 |
-| Alarms | `GET {app}/v2/users/{userId}/alarms` | Seen 2026-09-21 |
-| Routines | `GET {app}/v2/users/{userId}/routines` | In code |
-| Adjustable base | `GET {app}/v1/users/{userId}/base` | In code |
-| Speaker probe (Pod 5) | `GET {app}/v1/users/{userId}/audio/player` (404 = no speaker) | In code |
-| Audio tracks | `GET {app}/v1/users/{userId}/audio/tracks` | In code |
-| Away mode | `GET {app}/v1/users/{userId}/away-mode` → `{"isAway": false}` | Seen 2026-11-03 |
-| Autopilot state | `GET {app}/v1/users/{userId}/autopilotDetails` | Seen 2026-11-03 |
-| Autopilot temperature events | `GET {app}/v1/users/{userId}/temp-events?from=…&to=…` | Unverified (upstream #168) |
-| Bedtime recommendation | `GET {app}/v1/users/{userId}/bedtime/recommendation` | Unverified (upstream #169) |
-| Water insert maintenance | `GET {app}/v1/user/{userId}/device_maintenance/maintenance_insert?v=2` (note singular `user`) | Unverified (upstream #171) |
-| Level suggestions | `GET {app}/v1/users/{userId}/level-suggestions` | Seen 2026-11-03 |
-| Streak challenges | `GET {app}/v1/users/{userId}/challenges` | Seen 2026-11-03 |
-| Travel | `GET {app}/v1/users/{userId}/travel/trips` | Seen 2026-11-03 |
+| Account and device list | `GET {client}/v1/users/me` | Seen 2026-11-06 |
+| Everything about a pod | `GET {client}/v1/devices/{deviceId}` | Seen 2026-11-06 |
+| Cheap field subset | `GET {client}/v1/devices/{id}?filter=leftUserId,rightUserId,awaySides` | Seen 2026-11-06 |
+| Current device / side | `GET {client}/v1/users/{userId}/current-device` → `id`, `side`, `specialization`, `timeZone` | Seen 2026-11-06 |
+| User profile | `GET {client}/v1/users/{userId}` | Seen 2026-11-06 |
+| Sleep history | `GET {client}/v1/users/{userId}/trends?tz=…&from=YYYY-MM-DD&to=…&include-main=false&include-all-sessions=true&model-version=v2` | Seen 2026-11-06 |
+| Households (device picker) | `GET {app}/v1/household/users/{userId}/summary` → `currentSet`, `households` | Seen 2026-11-06 |
+| Subscriptions | `GET {app}/v1/users/{userId}/subscriptions` | Seen 2026-11-06 |
+| Temperature state | `GET {app}/v1/users/{userId}/temperature` | Seen 2026-11-06 |
+| All zones + schedules | `GET {app}/v1/users/{userId}/temperature/all` | Seen 2026-11-06 |
+| Pillow zone | `GET {app}/v1/users/{userId}/temperature/pillow` | Seen 2026-11-06 |
+| Alarms | `GET {app}/v2/users/{userId}/alarms` → `alarms`, `recommendedAlarm` | Seen 2026-11-06 |
+| Routines | `GET {app}/v2/users/{userId}/routines` → `settings`, `state` | Seen 2026-11-06 |
+| Adjustable base | `GET {app}/v1/users/{userId}/base` (404 with no base) | Seen 2026-11-06 (404 only) |
+| Speaker probe (Pod 5) | `GET {app}/v1/users/{userId}/audio/player` (404 = no speaker) | Seen 2026-11-06 (404 only) |
+| Audio tracks | `GET {app}/v1/users/{userId}/audio/tracks` | Seen 2026-11-06 |
+| Away mode | `GET {app}/v1/users/{userId}/away-mode` → `{"isAway": false}` | Seen 2026-11-06 |
+| Autopilot state | `GET {app}/v1/users/{userId}/autopilotDetails` | Seen 2026-11-06 |
+| Autopilot temperature events | `GET {app}/v1/users/{userId}/temp-events?from=…&to=…` (full ISO timestamps; bare dates are 400) → `events`, `phases` | Seen 2026-11-06 |
+| Bedtime recommendation | `GET {app}/v1/users/{userId}/bedtime/recommendation` → `daysAnalyzed`, `recommendedBedtime`, `standardDeviation`, `topPerformingDays` | Seen 2026-11-06 |
+| Water insert maintenance | `GET {app}/v1/user/{userId}/device_maintenance/maintenance_insert?v=2` (note singular `user`) → a list, one entry per device | Seen 2026-11-06 |
+| Level suggestions | `GET {app}/v1/users/{userId}/level-suggestions` | Seen 2026-11-06 |
+| Streak challenges | `GET {app}/v1/users/{userId}/challenges` | Seen 2026-11-06 |
+| Travel | `GET {app}/v1/users/{userId}/travel/trips` | Seen 2026-11-06 |
 
 ### Writes
 
@@ -148,17 +148,38 @@ All seen 2026-11-03 unless dated otherwise.
 
 Endpoints the iOS app called on 2026-11-03 and 2026-11-04, captured with a
 proxy on one account. Shapes are top-level keys plus enum values seen. These
-are **Seen 2026-11-03**, but only from that one account. Nobody has called them
-from code yet.
+are **Seen 2026-11-03**, but only from that one account.
+
+**2026-11-06: read live from code** with `scripts/probe_endpoints.py` on a
+second account (one pod, no base, no speaker). Every endpoint in this section
+answered 200 with the keys listed, except: `{app}/v1/devices/{id}/live` drops
+the connection (it is probably a stream, like `events`), and `tags/days` and
+`tags/recommendations` answer 400 without query parameters (the right ones are
+unknown). Not yet read on an account without a pod, and not with another
+account's token.
+
+The client reads five of them, each called live on 2026-11-06 and parsed
+correctly:
+
+| Request | Client method |
+| --- | --- |
+| `{app}/v1/devices/{id}/status` | `EightSleep.device_status()` → `DeviceStatus`, None on 404 |
+| `{app}/v1/devices/{id}/priming/tasks/latest` | `EightSleep.latest_prime_task()` → `PrimeTask` with `ran_dry`, None on 404 or no `task` |
+| `{app}/v1/devices/{id}/priming/schedule` | `EightSleep.priming_schedule()` → raw list, None on 404 |
+| `{app}/v3/users/{id}/subscriptions` | `EightUser.subscription()` → `SubscriptionState`; 403 → `unavailable` |
+| `{app}/v1/users/{id}/app-state/onboard` | `EightUser.onboarding_state()` → `OnboardingState`, None on 404 |
+
+To check them live, run `scripts/probe_endpoints.py` (read-only; prints status
+and top-level key names, never values or ids).
 
 **Pod health and priming**: the most useful for monitoring a fleet.
 
 | Request | Answers |
 | --- | --- |
-| `GET {app}/v1/devices/{deviceId}/status` | `status` (`"updating"` seen), `ready`, `hasWater`, `needsPrime`, `firmwareVersion`, `firmwareUpdated`, `firmwareUpdating`, `lastConnected`. A compact health read. Note `needsPrime` here vs `needsPriming` on the device record |
+| `GET {app}/v1/devices/{deviceId}/status` | `status` (`"updating"`, `"ready"` seen), `ready`, `hasWater`, `needsPrime`, `firmwareVersion`, `firmwareUpdated`, `firmwareUpdating`, `lastConnected`, `peripherals` (seen 2026-11-06). A compact health read. Note `needsPrime` here vs `needsPriming` on the device record |
 | `GET {app}/v1/devices/{deviceId}/priming/tasks/latest` | `task`: `status` (`finished`), `reason` (`requested` \| `scheduled`), `outcome` (`succeeded` \| `out-of-water`), `outcomeReason` (`flagCleared` \| `noWater`), `created`, `started`, `finished`, `isBlanketPriming`, `coverInfo.label` |
-| `GET {app}/v1/devices/{deviceId}/priming/schedule` | `schedule: [...]` |
-| `GET {app}/v1/devices/{deviceId}/live` | not answered in the capture |
+| `GET {app}/v1/devices/{deviceId}/priming/schedule` | `schedule`: a list of strings, one per day, like `"Monday 03:00"` (seen 2026-11-06, 7 entries) |
+| `GET {app}/v1/devices/{deviceId}/live` | not answered in the capture; drops the connection when called from code (2026-11-06) |
 
 `outcome: "out-of-water"` on the latest prime is a direct "this bed ran dry"
 signal. `reason: "scheduled"` shows pods prime on a schedule as well as on request.
@@ -177,10 +198,29 @@ hand-picking a record by id prefix.** Whether v3 has the same own-token-only
 403 as v1 is untested. `POST {app}/v3/users/{userId}/subscriptions/redeem`
 takes `{code, userId}`.
 
+Read live 2026-11-06 on a second account: top level had the computed flags
+but no `cancellationReason` or `captureStatus` (probably only present on a
+churned account). Records also carry `isActive`, `isActiveBasic`,
+`isActivePremium`, `inGracePeriod`, `hasBillingFailure`, `type` (`premium`),
+`subscriptionProductName`, `createdAt`, `expiresAt`, `willRenew`. That account
+had a **new record kind, `pool-seat-<n>`**, with `provider: "pool"`,
+`status: "active"`, `willRenew: false` and a future `expiresAt`, as primary
+beside an expired `eight-internal-temporary-…` placeholder (`status: "inactive"`).
+The id field is `subscriptionId`; there is no `id` key.
+
+The client (2026-11-06) judges v3 by id prefix, not by `status` / `provider`.
+`provider: "eight_internal"` covers both the never-paid placeholder and the
+granted membership, and nobody has seen `status` on a granted record. A pool
+seat is judged by `expiresAt` alone, because `willRenew` is false while it is
+live. The computed flags are passed through raw.
+
 **Onboarding state exists after all.** `GET {app}/v1/users/{userId}/app-state/onboard`
 → `{"value": {lastOnboardTime, testDriveCompletedTimestamp, pod5TestDriveCompletedTimestamp}}`,
-and the app writes it with `PATCH` and the same `{"value": {...}}` body. This
-is likely what the phone's "test drive" nag reads. `app-state/messages` (GET/PUT
+and the app writes it with `PATCH {app}/v1/users/{userId}/app-state/onboard`
+and the same body: `{"value": {"lastOnboardTime": "<ISO>", "testDriveCompletedTimestamp": "<ISO>", "pod5TestDriveCompletedTimestamp": "<ISO>"}}`.
+Whether a `PATCH` merges keys inside `value` or replaces it is unknown. This
+client reads it only and has no write. This is likely what the phone's "test
+drive" nag reads. `app-state/messages` (GET/PUT
 `{"value": ...}`) is the same pattern.
 
 **Other reads seen:**
@@ -289,6 +329,9 @@ read access is unknown. (Seen 2026-09-20.)
   newer placeholder; newest-wins picks the wrong one. (Seen 2026-09-24.)
 - Record kinds, by id prefix:
   - `sub_…`: a Stripe purchase. Can carry `hasBillingFailure: true`.
+  - `pool-seat-<n>`: a seat from a pooled plan, `provider: "pool"`.
+    `willRenew: false` even while live, so judge it by `expiresAt` only.
+    (Seen 2026-11-06, on v3.)
   - `eight-internal-temporary-<uuid>`: account created, never paid.
     `isActive: false`, `expiresAt == createdAt`.
   - `exclusive-member-<uuid>`: membership granted by Eight Sleep.

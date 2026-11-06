@@ -36,7 +36,7 @@ from .constants import (
 )
 from .exceptions import RequestError
 from .user import EightUser
-from .structs import Token
+from .structs import DeviceStatus, PrimeTask, Token
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -602,6 +602,82 @@ class EightSleep:
             entry.get("previousInsertReplacement")
         )
 
+    async def get_or_none(self, url: str, missing: tuple[int, ...] = (404,)) -> Any:
+        """GET a URL; return None when it answers one of the `missing` statuses."""
+        try:
+            return await self.api_request("get", url, expected_statuses=missing)
+        except RequestError as err:
+            if err.status in missing:
+                return None
+            raise
+
+    def optional_datetime(self, value: Any) -> datetime | None:
+        """Parse an API timestamp, or None if it is missing or unreadable."""
+        if not value:
+            return None
+        try:
+            return self.convert_string_to_datetime(value)
+        except ValueError:
+            return None
+
+    async def device_status(self) -> DeviceStatus | None:
+        """Return a compact health read of the pod, or None on a 404.
+
+        Naming differs between endpoints: this one says `needsPrime`, while
+        the device record (`GET {client}/v1/devices/{id}`, read by
+        `need_priming`) says `needsPriming`. Both are mapped to "needs prime".
+        """
+        url = f"{APP_API_URL}v1/devices/{self.device_id}/status"
+        data = await self.get_or_none(url)
+        if not isinstance(data, dict):
+            return None
+
+        def flag(key: str) -> bool | None:
+            value = data.get(key)
+            return bool(value) if value is not None else None
+
+        return DeviceStatus(
+            status=data.get("status"),
+            ready=flag("ready"),
+            has_water=flag("hasWater"),
+            needs_prime=flag("needsPrime"),
+            firmware_version=data.get("firmwareVersion"),
+            firmware_updated=flag("firmwareUpdated"),
+            firmware_updating=flag("firmwareUpdating"),
+            last_connected=self.optional_datetime(data.get("lastConnected")),
+        )
+
+    async def latest_prime_task(self) -> PrimeTask | None:
+        """Return the pod's latest priming task, or None if it has none.
+
+        `outcome == "out-of-water"` means the bed ran dry during the prime.
+        """
+        url = f"{APP_API_URL}v1/devices/{self.device_id}/priming/tasks/latest"
+        data = await self.get_or_none(url)
+        task = data.get("task") if isinstance(data, dict) else None
+        if not isinstance(task, dict):
+            return None
+        return PrimeTask(
+            status=task.get("status"),
+            reason=task.get("reason"),
+            outcome=task.get("outcome"),
+            outcome_reason=task.get("outcomeReason"),
+            created=self.optional_datetime(task.get("created")),
+            started=self.optional_datetime(task.get("started")),
+            finished=self.optional_datetime(task.get("finished")),
+        )
+
+    async def priming_schedule(self) -> list[dict[str, Any]] | None:
+        """Return the pod's priming schedule, or None if it isn't reported.
+
+        Items are returned raw. Seen live 2026-11-06 as strings of the form
+        "Monday 03:00", one per day.
+        """
+        url = f"{APP_API_URL}v1/devices/{self.device_id}/priming/schedule"
+        data = await self.get_or_none(url)
+        schedule = data.get("schedule") if isinstance(data, dict) else None
+        return schedule if isinstance(schedule, list) else None
+
     @staticmethod
     def _replacement_date(replacement: Any) -> date | None:
         """Return the replacementDate of a maintenance insert record."""
@@ -620,9 +696,14 @@ class EightSleep:
         data: dict[str, Any] | None = None,
         input_headers: dict[str, Any] | None = None, # Explicitly type hint
         return_json: bool = True,
-        _is_retry: bool = False
+        _is_retry: bool = False,
+        expected_statuses: tuple[int, ...] = (),
     ) -> Any:
-        """Make api request with 401 retry."""
+        """Make api request with 401 retry.
+
+        A status in `expected_statuses` still raises RequestError, but is
+        logged at debug instead of error: the caller treats it as an answer.
+        """
 
         current_headers: dict[str, Any] # Define type for current_headers
         if input_headers is not None:
@@ -655,7 +736,14 @@ class EightSleep:
                 # For the retry, we make a new call to api_request.
                 # It will pick up the new token when it calls self.token again.
                 return await self.api_request(
-                    method, url, params, data, input_headers, return_json, _is_retry=True
+                    method,
+                    url,
+                    params,
+                    data,
+                    input_headers,
+                    return_json,
+                    _is_retry=True,
+                    expected_statuses=expected_statuses,
                 )
 
             if resp.status >= 400:
@@ -671,7 +759,10 @@ class EightSleep:
                         error_message += f" - Response: {error_text}"
                     except Exception as text_exc:
                         error_message += f" - Failed to get response text: {text_exc}"
-                _LOGGER.error(error_message)
+                if resp.status in expected_statuses:
+                    _LOGGER.debug(error_message)
+                else:
+                    _LOGGER.error(error_message)
                 raise RequestError(
                     error_message, status=resp.status, error_details=error_details
                 )
