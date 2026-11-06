@@ -38,3 +38,8 @@ and two in `test_speaker`.
 Also seen on upstream that day: `prepare-1.0.25-release` (no new commits over
 main), and a bot branch `feature/pr-analysis-consolidated-report-…` with an
 analysis of old PRs #113, #118 and #120. Not reviewed.
+
+## 2026-11-06: no new upstream activity
+
+The 13 PRs logged on 2026-11-03 are still open upstream; nothing merged and
+no new PRs. `upstream/main` is unchanged at `1f5d84e`.
