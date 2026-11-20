@@ -43,3 +43,13 @@ analysis of old PRs #113, #118 and #120. Not reviewed.
 
 The 13 PRs logged on 2026-11-03 are still open upstream; nothing merged and
 no new PRs. `upstream/main` is unchanged at `1f5d84e`.
+
+## 2026-11-20: #160, #162 and #180
+
+Upstream main moved from `1f5d84e` to `af66cb6` (1.0.25 and 1.0.26). Asked to carry #160, #162 and #180.
+
+- **#180** (no Content-Type on bodyless GETs): taken, `git cherry-pick -x`. Recorded in `docs/api-notes.md`.
+- **#160** (setpoint not time-limited): already carried in PR #2. Skipped, empty pick.
+- **#162** (one-off alarm time as str): already carried in PR #2. Skipped, empty pick.
+- `constants.py`: client id and secret unchanged. User-agent is still `Home Assistant {__version__}`; only the content-type header was removed.
+- Not yet logged: the rest of the merges since 2026-11-06 (#164-#176, #181-#182) and open PRs #174 and #183.

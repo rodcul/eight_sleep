@@ -3,6 +3,8 @@
 
 Home Assistant Eight Sleep integration that works with Eight Sleep's V2 API and OAUTH2
 
+**API reference:** what this fork knows about the private Eight Sleep API (endpoints, auth, gotchas) is in [docs/api-notes.md](docs/api-notes.md).
+
 ## Installation
 ### HACS
 
