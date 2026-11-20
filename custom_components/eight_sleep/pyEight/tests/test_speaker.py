@@ -2,6 +2,8 @@
 import unittest
 from unittest.mock import AsyncMock, patch
 
+from aiohttp import ClientError
+
 from custom_components.eight_sleep.pyEight.eight import EightSleep
 from custom_components.eight_sleep.pyEight.user import EightUser
 from custom_components.eight_sleep.pyEight.constants import APP_API_URL
@@ -156,25 +158,19 @@ class TestEightSleepSpeaker(unittest.IsolatedAsyncioTestCase):
 
     @patch('custom_components.eight_sleep.pyEight.eight.ClientSession')
     @patch('custom_components.eight_sleep.pyEight.eight.EightSleep._get_auth')
-    async def test_fetch_device_list_sets_has_speaker_from_audio_feature(self, mock_get_auth, MockAiohttpSession):
-        """Test fetch_device_list sets has_speaker when audio feature present."""
+    async def test_audio_feature_does_not_set_has_speaker(self, mock_get_auth, MockAiohttpSession):
+        """The "audio" feature flag can't be trusted; only the probe sets has_speaker."""
         mock_get_auth.return_value = AsyncMock(bearer_token="token", expiration=9999999999)
 
         mock_aiohttp_session = MockAiohttpSession.return_value
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.json = AsyncMock(return_value={
-            "user": {"devices": ["dev123"], "features": ["cooling", "elevation", "audio"]}
-        })
-        mock_aiohttp_session.request = AsyncMock(return_value=mock_response)
         mock_aiohttp_session.close = AsyncMock()
 
         eight = EightSleep(self.email, self.password, self.timezone)
         eight._api_session = mock_aiohttp_session
 
-        await eight.fetch_device_list()
+        eight.handle_device_json({"features": ["cooling", "elevation", "audio"]})
 
-        self.assertTrue(eight.has_speaker)
+        self.assertFalse(eight.has_speaker)
         self.assertTrue(eight._is_pod)
         self.assertTrue(eight._has_base)
 
@@ -266,17 +262,16 @@ class TestEightSleepSpeaker(unittest.IsolatedAsyncioTestCase):
     @patch('custom_components.eight_sleep.pyEight.eight.ClientSession')
     @patch('custom_components.eight_sleep.pyEight.eight.EightSleep._get_auth')
     async def test_probe_speaker_availability_request_error(self, mock_get_auth, MockAiohttpSession):
-        """Test probe returns False on RequestError (expected for devices without speaker)."""
+        """Test probe returns False when the request fails."""
         mock_get_auth.return_value = AsyncMock(bearer_token="token", expiration=9999999999)
 
         mock_aiohttp_session = MockAiohttpSession.return_value
+        # The probe calls the session directly, not api_request().
+        mock_aiohttp_session.request = AsyncMock(side_effect=ClientError("boom"))
         mock_aiohttp_session.close = AsyncMock()
 
         eight = EightSleep(self.email, self.password, self.timezone)
         eight._api_session = mock_aiohttp_session
-
-        # Mock api_request to raise RequestError
-        eight.api_request = AsyncMock(side_effect=RequestError("404 Not Found"))
 
         mock_user = AsyncMock(spec=EightUser)
         mock_user.user_id = "user123"

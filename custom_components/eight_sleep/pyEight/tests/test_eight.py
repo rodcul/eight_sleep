@@ -19,7 +19,7 @@ class TestEightSleep(unittest.IsolatedAsyncioTestCase):
 
     @patch('custom_components.eight_sleep.pyEight.eight.ClientSession')
     @patch('custom_components.eight_sleep.pyEight.eight.EightSleep._get_auth') # Patch _get_auth directly
-    async def test_fetch_device_list_successful(self, mock_get_auth, MockAiohttpSession):
+    async def test_fetch_device_id_successful(self, mock_get_auth, MockAiohttpSession):
         # _get_auth is called by self.token property if token is None or expired.
         # Mock it to avoid actual HTTP call during token property access.
         mock_get_auth.return_value = AsyncMock(bearer_token="fake_token", user_id="fake_user", expiration=9999999999)
@@ -39,14 +39,23 @@ class TestEightSleep(unittest.IsolatedAsyncioTestCase):
         eight = EightSleep(self.email, self.password, self.timezone)
         # eight._api_session needs to be the mocked one
         eight._api_session = mock_aiohttp_session_instance
-        await eight.fetch_device_list()
+        await eight.fetch_device_id()
 
         self.assertEqual(eight.device_id, "dev123")
-        self.assertTrue(eight._is_pod)
-        self.assertTrue(eight._has_base)
+        # The user's features say nothing about this device.
+        self.assertFalse(eight._is_pod)
+        self.assertFalse(eight._has_base)
         mock_aiohttp_session_instance.request.assert_called_once_with(
             "get", f"{CLIENT_API_URL}/users/me", headers=unittest.mock.ANY, params=None, json=None, timeout=unittest.mock.ANY
         )
+
+    def test_handle_device_json_sets_pod_and_base_from_features(self):
+        eight = EightSleep(self.email, self.password, self.timezone)
+
+        eight.handle_device_json({"features": ["cooling", "elevation"]})
+
+        self.assertTrue(eight._is_pod)
+        self.assertTrue(eight._has_base)
 
     @patch('custom_components.eight_sleep.pyEight.eight.ClientSession')
     @patch('custom_components.eight_sleep.pyEight.eight.EightSleep._get_auth')

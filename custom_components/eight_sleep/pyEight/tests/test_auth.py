@@ -98,11 +98,16 @@ class TestAuth(unittest.IsolatedAsyncioTestCase):
             "user": {"devices": ["fake_device_id_123"], "features": ["cooling"]}
         })
 
-        # Mock for assign_users (/devices/{id})
+        # Mock for update_device_data and assign_users (/devices/{id}).
+        # The pod/base flags come from the device's features, not the user's.
         mock_devices_id_response = AsyncMock()
         mock_devices_id_response.status = 200
         mock_devices_id_response.json = AsyncMock(return_value={
-            "result": {"leftUserId": "user_left_abc", "rightUserId": "user_right_def"}
+            "result": {
+                "leftUserId": "user_left_abc",
+                "rightUserId": "user_right_def",
+                "features": ["cooling"],
+            }
         })
 
         # Mock for assign_users (/users/{id} for left user)
