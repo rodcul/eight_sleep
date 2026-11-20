@@ -258,6 +258,14 @@ with `devices`, `notifications`; push-target registration under
 
 ## Gotchas
 
+### Don't send Content-Type on a GET with no body
+
+- **The edge can answer 403 to a bodyless GET that carries
+  `content-type: application/json`.** Send the header only on requests that have
+  a JSON body. Upstream hit this in November 2026 and dropped the header from
+  the default set (lukas-clarke/eight_sleep#180). Unverified: not reproduced
+  here, so don't assume every GET is affected. (2026-11-20.)
+
 ### A 200 is not proof a write landed
 
 - **LED writes in a burst can answer 200, echo the value, and still be lost.**
