@@ -52,4 +52,28 @@ Upstream main moved from `1f5d84e` to `af66cb6` (1.0.25 and 1.0.26). Asked to ca
 - **#160** (setpoint not time-limited): already carried in PR #2. Skipped, empty pick.
 - **#162** (one-off alarm time as str): already carried in PR #2. Skipped, empty pick.
 - `constants.py`: client id and secret unchanged. User-agent is still `Home Assistant {__version__}`; only the content-type header was removed.
-- Not yet logged: the rest of the merges since 2026-11-06 (#164-#176, #181-#182) and open PRs #174 and #183.
+
+### Catch-up to upstream 1.0.26 (same day)
+
+Compared our tree to `upstream/main` (`af66cb6`). Most of the sensor PRs
+(#164-#172, #156) were already carried on 2026-11-03. Taken now, all with
+`cherry-pick -x`:
+
+| Upstream | What | Notes |
+|---|---|---|
+| #173, `92ee49d` | `via_device` replaced with the registered hub ID, kept on HA before 2026.8 | Clean pick |
+| #175 | Warn once for subscription-gated alarm polling | Conflicted in `eight.py` with our expected-statuses debug logging. Kept both: expected statuses log at debug, then the alarm warn-once, then error |
+| #168 follow-up | Clear last night's Autopilot events when the day changes | Clean |
+| #166 follow-up | A `"None"` string for daily sleep debt is no value | Clean |
+| #181 | CI runs both test suites on pull requests | Clean |
+
+Skipped:
+
+- #181's test fixes (`0a40384`): we fixed the same four stale tests in `e75aeff`.
+- #176, #182 version bumps (1.0.25, 1.0.26): this fork's version is its own.
+- #183 (leave Autopilot in charge when turning a side on, open) and #174
+  (climate temperatures as native attributes, open): both touch `climate.py`
+  only and neither is merged upstream. Revisit when they merge. #183 changes
+  turn-on behaviour, so read it before the HF0 app copies it.
+
+Tests: 235 pass.
